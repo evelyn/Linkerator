@@ -18,8 +18,7 @@ This is a modern revival of Gazmik Fizzwidget's classic **Linkerator** addon! It
 This addon is a bridge for Ludwig and **will not work without it.**
 
 1.   First, make sure you have **Ludwig** and **Ludwig\_Data** installed. You can get them from the official CurseForge page: [https://www.curseforge.com/wow/addons/ludwig](https://www.curseforge.com/wow/addons/ludwig)
-2.   Install **!Linkerator**.
-3.   Ensure all three folders (`Ludwig`, `Ludwig_Data`, and `!Linkerator`) are in your `World of Warcraft\_classic_\Interface\AddOns\` folder.
+2.   Install **Linkerator**. Ensure all three folders (`Ludwig`, `Ludwig_Data`, and `!Linkerator`) are in your `World of Warcraft\_classic_\Interface\AddOns\` folder.
 
 There is no configuration required. If Ludwig is installed, this addon will work.
 
