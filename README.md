@@ -27,4 +27,4 @@ There is no configuration required. If Ludwig is installed, this addon will work
 This addon stands on the shoulders of giants. All credit for the brilliant original work goes to:
 
 -   **Gazmik Fizzwidget:** For the original concept and user experience of Linkerator. ([fizzwidget.com](http://fizzwidget.com/) - non HTTPS, sorry!)
--   **Jaliborc (João Cardoso):** For creating and maintaining the incredible Ludwig database addon.
+-   **Jaliborc & Tuller:** For creating and maintaining the incredible Ludwig database addon.
