@@ -1,3 +1,8 @@
+package-as: Linkerator
+
 ignore:
-  - README.md
-  - Linkerator.gif
+    - README.md
+    - Linkerator.gif
+
+required-dependencies:
+    - ludwig
