@@ -1,4 +1,4 @@
-## !Linkerator
+## Linkerator
 
 ![](Linkerator.gif)
 
