@@ -6,4 +6,4 @@
 ## Dependencies: Ludwig, Ludwig_Data
 ## X-Category: Interface Enhancements
 
-Linkerator.lua
+!Linkerator.lua
