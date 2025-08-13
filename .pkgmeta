@@ -1,4 +1,5 @@
-package-as: Linkerator
+move-folders:
+    Linkerator: "!Linkerator"
 
 ignore:
     - README.md

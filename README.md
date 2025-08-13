@@ -23,7 +23,7 @@ My version of Linkerator supports a shortcode system for creating precise item l
 -   **Link with Both:** `[#ItemID/SuffixID.EnchantID]` works for items with both a random property and an enchant.
 
 **Shortcode Helper:** When you link an item from your bags that has an enchant or suffix, Linkerator automatically prints its shortcode to your chat for easy copying!
-> [Linkerator]: [Raider's Belt of the Bear] - Shortcode: [#9788/1182]
+> [Linkerator] [Raider's Belt of the Bear] - Shortcode: [#9788/1182]
 
 ### Installation (Required!)
 
