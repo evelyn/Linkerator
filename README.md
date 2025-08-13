@@ -9,7 +9,7 @@ This is a modern revival of Gazmik Fizzwidget's classic **Linkerator** addon! It
 ### Features
 
 -   **Automatic Item Linking:** Allows you to insert an item link in chat by merely typing its name in brackets. For example, typing `/g [Arcanite Bar]` will automatically send a message to your guild with a clickable link.
--   **Live Autocomplete:** As you type a link like `[Arcan...`, possible completions will appear. Pressing **Tab** allows you to instantly complete the item name.
+-   **Live Autocomplete:** As you type a link like `[Arcan...`, possible completions will appear. Pressing **Tab** or closing with **`]`** allows you to instantly complete the item name.
 -   **Paste and Go:** You can copy and paste entire messages that already contain item links, and they will be preserved perfectly. Any un-linked items in brackets will be converted automatically when you send.
 -   **Link by Item ID:** If you know an item's ID number, you can type it in brackets with a `#` to link it (e.g., `[#19019]` will link `[Thunderfury, Blessed Blade of the Windseeker]`).
 
