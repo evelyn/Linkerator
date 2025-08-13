@@ -1,241 +1,193 @@
--- Ensure Ludwig and its data are loaded before running
+-- Ensure Ludwig is present
 if not Ludwig then return end
 
 local Linkerator = {}
-
 local updateFrame = CreateFrame("Frame")
-updateFrame.timer = 0
-updateFrame.targetFrame = nil
+updateFrame.timer, updateFrame.targetFrame = 0, nil
 
-local AUTOCOMPLETE_PATTERN = "%[([^%]]+)$"
+-- I love RegEx so much
+local AUTOCOMPLETE_PATTERN  = "%[([^%]]+)$"
+local BRACKETED_CLOSED      = "%[([^%]]+)%]$"
+local EXISTING_LINK_PATTERN = "(|c%x+|H.-|h.-|h|r)"
+local ID_PREFIX             = "^#(%d+)"
+local SUFFIX_CAPTURE        = "/(%-?%d+)"
+local ENCHANT_CAPTURE       = "%.(%d+)"
 
--- This runs when the user has stopped typing
+-- Link layout (Classic/era):
+-- item:ItemID:EnchantID:Gem1:Gem2:Gem3:Gem4:SuffixID:UniqueID:LinkLevel
+local ITEM_STRING_FMT = "item:%d:%d:0:0:0:0:%d:0:%d"
+
+local function escape_pattern(str)
+    return (str:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"))
+end
+
+local function player_level()
+    return (UnitLevel and UnitLevel("player")) or 0
+end
+
+-- Suggest a single unambiguous completion
 function Linkerator.UpdateSuggestion(frame)
     if not frame then return end
     local text = frame:GetText()
-    local query = text:match(AUTOCOMPLETE_PATTERN)
+    local query = text and text:match(AUTOCOMPLETE_PATTERN)
+    if not query or query:find("^#") then return end
 
-    if query and not query:find("^#") then -- Don't autocomplete for ID-based links
-        -- find all possible matches
-        local matches = Linkerator.GetPrefixMatches(query)
-
-        -- only autocomplete if there is exactly one possible result
-        if #matches == 1 then
-            local originalTextLength = #text
-            local fullName = matches[1]
-            local newText = text:gsub(AUTOCOMPLETE_PATTERN, "[" .. fullName)
-            
-            if newText ~= text then
-                frame:SetText(newText)
-                frame:HighlightText(originalTextLength, -1)
-            end
+    local matches = Linkerator.GetPrefixMatches(query)
+    if #matches == 1 then
+        local fullName = matches[1]
+        local newText = text:gsub(AUTOCOMPLETE_PATTERN, "[" .. fullName)
+        if newText ~= text then
+            frame:SetText(newText)
+            frame:HighlightText(#text, -1)
         end
     end
 end
 
--- Tries to create a link from a query, with graceful fallbacks for shortcodes
+-- Build links from [#ItemID/SuffixID.EnchantID] or [Item Name]
 function Linkerator.LinkFromQuery(query)
-    if not query then return nil end
+    if not query or query == "" then return nil end
 
     if query:sub(1,1) == "#" then
-        local content = query:sub(2) -- Get everything after the '#'
-        
-        -- This robust method correctly parses all parts of the shortcode
-        local itemID_str, enchantID_str = strsplit(".", content)
-        local final_itemID_str, suffixID_str = strsplit("/", itemID_str)
+        local ItemID_str = query:match(ID_PREFIX)
+        if not ItemID_str then return nil end
 
-        local itemID = tonumber(final_itemID_str)
-        local enchantID = tonumber(enchantID_str)
-        local suffixID = tonumber(suffixID_str)
+        local SuffixID = tonumber(query:match(SUFFIX_CAPTURE)) or 0
+        local EnchantID = tonumber(query:match(ENCHANT_CAPTURE)) or 0
+        local ItemID = tonumber(ItemID_str)
 
-        if not itemID then return nil end -- The base ID must exist
-
-        -- Attempt to link the most specific version first (full combo)
-        if suffixID and enchantID then
-            local itemString = "item:" .. itemID .. ":" .. enchantID .. ":::::" .. suffixID
-            local _, link = GetItemInfo(itemString)
-            if link then return link end
-        end
-
-        -- Fallback 1: Try with just suffix or just enchant
-        if suffixID then
-            local itemString = "item:" .. itemID .. ":::::" .. suffixID
-            local _, link = GetItemInfo(itemString)
-            if link then return link end
-        end
-        if enchantID then
-            local itemString = "item:" .. itemID .. ":" .. enchantID .. ":::::0"
-            local _, link = GetItemInfo(itemString)
-            if link then return link end
-        end
-
-        -- Fallback 2: Try with only the base ItemID
-        local _, link = GetItemInfo(itemID)
-        if link then return link end
-    else
-        -- Fallback to searching by name if it's not a shortcode
-        local id, _ = Linkerator.ClosestItem(query)
-        if id then
-            return Ludwig:GetLink(id)
-        end
+        local itemString = ITEM_STRING_FMT:format(ItemID, EnchantID, SuffixID, player_level())
+        local _, link = GetItemInfo(itemString)
+        return link
     end
 
-    return nil -- All attempts failed
+    local id = select(1, Linkerator.ClosestItem(query))
+    return id and Ludwig:GetLink(id) or nil
 end
 
--- OnChar handles instant linking when ']' is typed, or starts the suggestion timer
+-- Type: instant-link on ']', else start suggestion timer
 function Linkerator.OnChar(frame)
-    local text = frame:GetText()
-
+    local text = frame:GetText() or ""
     if text:sub(-1) == "]" then
-        local content = text:match("%[([^%]]+)%]$") -- Get what was just closed
+        local content = text:match(BRACKETED_CLOSED)
         if content then
-            local fullLink = Linkerator.LinkFromQuery(content)
-            if fullLink then
-                local newText = text:gsub("%[[^%]]+%]$", fullLink)
+            local link = Linkerator.LinkFromQuery(content)
+            if link then
+                local newText = text:gsub("%[[^%]]+%]$", link)
                 frame:SetText(newText)
-                frame:SetCursorPosition(string.len(newText))
-                return -- Stop processing to avoid starting the suggestion timer
+                frame:SetCursorPosition(#newText)
+                return
             end
         end
     end
 
-    -- If we didn't just link something, start the timer for name suggestions
-    updateFrame.timer = 0.25
-    updateFrame.targetFrame = frame
+    updateFrame.timer, updateFrame.targetFrame = 0.25, frame
     updateFrame:SetScript("OnUpdate", Linkerator.OnUpdate)
 end
 
--- The timer's update function
+-- Debounce timer
 function Linkerator.OnUpdate(self, elapsed)
     self.timer = self.timer - elapsed
     if self.timer <= 0 then
-        -- User paused, so show a suggestion if we have one
         self:SetScript("OnUpdate", nil)
         Linkerator.UpdateSuggestion(self.targetFrame)
         self.targetFrame = nil
     end
 end
 
--- Tab forces a completion and creates the link
+-- Tab = force completion
 function Linkerator.OnTab(frame)
-    updateFrame:SetScript("OnUpdate", nil) -- Cancel any pending suggestion
+    updateFrame:SetScript("OnUpdate", nil)
     local text = frame:GetText()
-    local query = text:match(AUTOCOMPLETE_PATTERN)
+    local query = text and text:match(AUTOCOMPLETE_PATTERN)
+    if not query then return end
 
-    if query then
-        local fullLink = Linkerator.LinkFromQuery(query)
-        if fullLink then
-            local newText = text:gsub(AUTOCOMPLETE_PATTERN, fullLink)
-            frame:SetText(newText)
-            frame:SetCursorPosition(string.len(newText))
-        end
+    local link = Linkerator.LinkFromQuery(query)
+    if link then
+        local newText = text:gsub(AUTOCOMPLETE_PATTERN, link)
+        frame:SetText(newText)
+        frame:SetCursorPosition(#newText)
     end
 end
 
--- Wrapper for Ludwig's "FindClosest"
+-- Ludwig wrappers
 function Linkerator.ClosestItem(query, ...)
-    if type(query) == "string" then
-        query = query:gsub("([%(%)%.%%%+%-*?%[%]%^%$])", "%%%1")
-    end
-    if Ludwig:Load('Data') then
-        return Ludwig.Database:FindClosest(query, ...)
-    end
-    return nil
+    if type(query) == "string" then query = escape_pattern(query) end
+    return Ludwig:Load("Data") and Ludwig.Database:FindClosest(query, ...) or nil
 end
 
--- Get ALL matches for a prefix
 function Linkerator.GetPrefixMatches(prefix)
     local matches = {}
     if type(prefix) ~= "string" or #prefix < 2 then return matches end
+    if not Ludwig:Load("Data") then return matches end
 
-    if Ludwig:Load('Data') then
-        local searchPattern = "^" .. prefix:lower():gsub("([%(%)%.%%%+%-*?%[%]%^%$])", "%%%1")
-        
-        -- Recursively search the nested Ludwig database
-        local function SearchLudwigData(dataTable)
-            for _, value in pairs(dataTable) do
-                if type(value) == "table" then
-                    SearchLudwigData(value) -- It's another table, go deeper
-                elseif type(value) == "string" then
-                    -- We've hit the item strings, so we can search them
-                    for name in value:gmatch("....([^_]+)_?") do
-                        if name:lower():find(searchPattern) then
-                            table.insert(matches, name)
-                        end
+    local searchPattern = "^" .. escape_pattern(prefix:lower())
+    local function Search(tbl)
+        for _, v in pairs(tbl) do
+            if type(v) == "table" then
+                Search(v)
+            elseif type(v) == "string" then
+                for name in v:gmatch("....([^_]+)_?") do
+                    if name:lower():find(searchPattern) then
+                        table.insert(matches, name)
                     end
                 end
             end
         end
-
-        SearchLudwigData(Ludwig_Items)
     end
+    Search(Ludwig_Items)
     return matches
 end
 
--- Hook chat frame events
-hooksecurefunc('ChatEdit_OnTextChanged', function(frame)
+-- Hook chat frames once
+hooksecurefunc("ChatEdit_OnTextChanged", function(frame)
     if not Linkerator[frame] then
-        frame:HookScript('OnChar', Linkerator.OnChar)
-        frame:HookScript('OnTabPressed', Linkerator.OnTab)
+        frame:HookScript("OnChar", Linkerator.OnChar)
+        frame:HookScript("OnTabPressed", Linkerator.OnTab)
         Linkerator[frame] = true
     end
 end)
 
--- This function prints a shortcode anytime a link with extra data is inserted into chat
+-- When a link with extra data hits chat edit, print a shortcode
 hooksecurefunc("ChatEdit_InsertLink", function(link)
-    if not link or type(link) ~= "string" or not link:find("item:") then
-        return
-    end
+    if type(link) ~= "string" or not link:find("item:") then return end
 
-    local itemID, enchantID, suffixID = link:match("item:(%d+):(%d*):%d*:%d*:%d*:%d*:(%-?%d*)")
-    
-    if itemID then
-        enchantID = tonumber(enchantID) or 0
-        suffixID = tonumber(suffixID) or 0
-        
-        -- Only print a message if the item has an enchant or a suffix
-        if enchantID ~= 0 or suffixID ~= 0 then
-            local shortcode_text = "[#" .. itemID
-            
-            if suffixID ~= 0 then
-                shortcode_text = shortcode_text .. "/" .. suffixID
-            end
-            if enchantID ~= 0 then
-                shortcode_text = shortcode_text .. "." .. enchantID
-            end
-            shortcode_text = shortcode_text .. "]"
+    local ItemID, EnchantID_raw, SuffixID_raw =
+        link:match("item:(%d+):(%d*):%d*:%d*:%d*:%d*:(%-?%d*)")
+    if not ItemID then return end
 
-            local prefix = "|cffb00b69[Linkerator]|r "
-            local message = prefix .. link .. " - Shortcode: " .. shortcode_text
-            print(message)
-        end
-    end
+    local EnchantID = tonumber(EnchantID_raw) or 0
+    local SuffixID = tonumber(SuffixID_raw) or 0
+    if EnchantID == 0 and SuffixID == 0 then return end
+
+    local shortcode = "[#" .. ItemID
+    if SuffixID ~= 0 then shortcode = shortcode .. "/" .. SuffixID end
+    if EnchantID ~= 0 then shortcode = shortcode .. "." .. EnchantID end
+    shortcode = shortcode .. "]"
+
+    print("|cffb00b69[Linkerator]|r " .. link .. " - Shortcode: " .. shortcode)
 end)
 
--- Linkifies any unlinked text in a message just before sending
+-- Replace bracketed queries just before send
 function Linkerator.ParseAndLinkMessage(message)
     local existingLinks = {}
-    local tempMessage = message:gsub("(|c%x+|H.-|h.-|h|r)", function(fullLink)
-        table.insert(existingLinks, fullLink)
+    local tmp = message:gsub(EXISTING_LINK_PATTERN, function(full)
+        table.insert(existingLinks, full)
         return "\1LINK:" .. #existingLinks .. "\2"
     end)
-    tempMessage = tempMessage:gsub("%[([^%]]+)%]", function(content)
-        local link = Linkerator.LinkFromQuery(content)
-        if link then
-            return link
-        else
-            return "[" .. content .. "]"
-        end
+
+    tmp = tmp:gsub("%[([^%]]+)%]", function(content)
+        return Linkerator.LinkFromQuery(content) or "[" .. content .. "]"
     end)
-    local finalMessage = tempMessage:gsub("\1LINK:(%d+)\2", function(index)
-        return existingLinks[tonumber(index)] or ""
+
+    tmp = tmp:gsub("\1LINK:(%d+)\2", function(i)
+        return existingLinks[tonumber(i)] or ""
     end)
-    return finalMessage
+
+    return tmp
 end
 
-local originalSendChatMessage = SendChatMessage
+-- Wrap SendChatMessage
+local orig_SendChatMessage = SendChatMessage
 SendChatMessage = function(message, chatType, language, channel)
-    local linkedMessage = Linkerator.ParseAndLinkMessage(message)
-    originalSendChatMessage(linkedMessage, chatType, language, channel)
+    return orig_SendChatMessage(Linkerator.ParseAndLinkMessage(message), chatType, language, channel)
 end
