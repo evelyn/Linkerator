@@ -9,9 +9,11 @@ This is a modern revival of Gazmik Fizzwidget's classic **Linkerator** addon! It
 ### Features
 
 -   **Automatic Item Linking:** Allows you to insert an item link in chat by merely typing its name in brackets. For example, typing `/g [Arcanite Bar]` will automatically send a message to your guild with a clickable link.
--   **Smart Autocomplete:** As you type a link like `[Symbol of...`, Linkerator will only complete the name if there's just one possible match. No more fighting Linkerator when typing items with similar names!
+-   **Smart Autocomplete:** As you type a link like `[Symbol of...`, Linkerator will only complete the name if there's just one possible match. No more fighting Ludwig when typing items with similar names!
 -   **Instant Linking:** Pressing **Tab** or closing a bracket with **`]`** on a partial item name will instantly find the closest match and turn it into a full, clickable link right in your chat box.
--   **Paste and Go:** You can copy and paste entire messages that already contain item links, and they will be preserved perfectly. Any un-linked items in brackets will be converted automatically when you send.
+-   **Paste and Go:** You can copy and paste entire messages that already contain item links, and they will be preserved perfectly\*. Any un-linked items in brackets will be converted automatically when you send.
+
+\* To an extent. Unfortunately, items with a suffix/randomized properties are not so easily copy and pasted. With that in mind...
 
 ### Advanced Linking & Shortcodes
 
