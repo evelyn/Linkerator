@@ -1,11 +1,8 @@
-package-as: Linkerator
-
-move-folders:
-    Linkerator: "!Linkerator"
+package-as: "!Linkerator"
 
 ignore:
     - README.md
     - Linkerator.gif
 
 required-dependencies:
-    - ludwig
+    - Ludwig
