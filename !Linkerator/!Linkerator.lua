@@ -15,7 +15,7 @@ function Linkerator.UpdateSuggestion(frame)
     local text = frame:GetText()
     local query = text:match(AUTOCOMPLETE_PATTERN)
 
-    if query then
+    if query and not query:find("^#") then -- Don't autocomplete for ID-based links
         -- find all possible matches
         local matches = Linkerator.GetPrefixMatches(query)
 
@@ -33,37 +33,65 @@ function Linkerator.UpdateSuggestion(frame)
     end
 end
 
--- Tries to create a link from a query, be it an ID like "#19019" or a name
+-- Tries to create a link from a query, with graceful fallbacks for shortcodes
 function Linkerator.LinkFromQuery(query)
     if not query then return nil end
 
-    local itemID = query:match("^#(%d+)$")
-    if itemID then
-        local id = tonumber(itemID)
-        if id then
-            local _, link = GetItemInfo(id)
-            return link -- will be nil if invalid, which is fine
+    if query:sub(1,1) == "#" then
+        local content = query:sub(2) -- Get everything after the '#'
+        
+        -- This robust method correctly parses all parts of the shortcode
+        local itemID_str, enchantID_str = strsplit(".", content)
+        local final_itemID_str, suffixID_str = strsplit("/", itemID_str)
+
+        local itemID = tonumber(final_itemID_str)
+        local enchantID = tonumber(enchantID_str)
+        local suffixID = tonumber(suffixID_str)
+
+        if not itemID then return nil end -- The base ID must exist
+
+        -- Attempt to link the most specific version first (full combo)
+        if suffixID and enchantID then
+            local itemString = "item:" .. itemID .. ":" .. enchantID .. ":::::" .. suffixID
+            local _, link = GetItemInfo(itemString)
+            if link then return link end
         end
+
+        -- Fallback 1: Try with just suffix or just enchant
+        if suffixID then
+            local itemString = "item:" .. itemID .. ":::::" .. suffixID
+            local _, link = GetItemInfo(itemString)
+            if link then return link end
+        end
+        if enchantID then
+            local itemString = "item:" .. itemID .. ":" .. enchantID .. ":::::0"
+            local _, link = GetItemInfo(itemString)
+            if link then return link end
+        end
+
+        -- Fallback 2: Try with only the base ItemID
+        local _, link = GetItemInfo(itemID)
+        if link then return link end
     else
+        -- Fallback to searching by name if it's not a shortcode
         local id, _ = Linkerator.ClosestItem(query)
         if id then
             return Ludwig:GetLink(id)
         end
     end
-    return nil
+
+    return nil -- All attempts failed
 end
 
 -- OnChar handles instant linking when ']' is typed, or starts the suggestion timer
 function Linkerator.OnChar(frame)
     local text = frame:GetText()
 
-    -- Check if the last character typed was a closing bracket
     if text:sub(-1) == "]" then
         local content = text:match("%[([^%]]+)%]$") -- Get what was just closed
         if content then
             local fullLink = Linkerator.LinkFromQuery(content)
             if fullLink then
-                -- We found a link, so replace the plain text with the full, clickable link
                 local newText = text:gsub("%[[^%]]+%]$", fullLink)
                 frame:SetText(newText)
                 frame:SetCursorPosition(string.len(newText))
@@ -151,6 +179,37 @@ hooksecurefunc('ChatEdit_OnTextChanged', function(frame)
         frame:HookScript('OnChar', Linkerator.OnChar)
         frame:HookScript('OnTabPressed', Linkerator.OnTab)
         Linkerator[frame] = true
+    end
+end)
+
+-- This function prints a shortcode anytime a link with extra data is inserted into chat
+hooksecurefunc("ChatEdit_InsertLink", function(link)
+    if not link or type(link) ~= "string" or not link:find("item:") then
+        return
+    end
+
+    local itemID, enchantID, suffixID = link:match("item:(%d+):(%d*):%d*:%d*:%d*:%d*:(%-?%d*)")
+    
+    if itemID then
+        enchantID = tonumber(enchantID) or 0
+        suffixID = tonumber(suffixID) or 0
+        
+        -- Only print a message if the item has an enchant or a suffix
+        if enchantID ~= 0 or suffixID ~= 0 then
+            local shortcode_text = "[#" .. itemID
+            
+            if suffixID ~= 0 then
+                shortcode_text = shortcode_text .. "/" .. suffixID
+            end
+            if enchantID ~= 0 then
+                shortcode_text = shortcode_text .. "." .. enchantID
+            end
+            shortcode_text = shortcode_text .. "]"
+
+            local prefix = "|cffb00b69[Linkerator]|r "
+            local message = prefix .. link .. " - Shortcode: " .. shortcode_text
+            print(message)
+        end
     end
 end)
 
