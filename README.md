@@ -1,5 +1,7 @@
 ## !Linkerator
 
+![](Linkerator.gif)
+
 Have you ever wanted to tell your friends about some impressive loot you saw another adventurer using? Share your regret about the quest reward you foolishly didn't choose? Spread word to your guild of what your raiding party found?
 
 This is a modern revival of Gazmik Fizzwidget's classic **Linkerator** addon! It brings back the simple, intuitive linking functionality we all loved, but now it's powered by the massive and up-to-date **Ludwig** item database.

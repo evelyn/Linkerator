@@ -1,0 +1,9 @@
+## Interface: 11507
+## Title: !Linkerator
+## Notes: Original Linkerator by Gazmik Fizzwidget (fizzwidget.com). Replicates Linkerator's autocompletion using Ludwig's database by Jaliborc (João Cardoso).
+## Author: Sister Saibh
+## Version: 1.0.1
+## Dependencies: Ludwig, Ludwig_Data
+## X-Category: Interface Enhancements
+
+!Linkerator.lua
